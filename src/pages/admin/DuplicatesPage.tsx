@@ -5,7 +5,7 @@ import { Badge } from '../../components/ui/badge';
 import { Progress } from '../../components/ui/progress';
 import { timeAgo } from '../../lib/normalize';
 import { findDuplicateGroups } from '../../lib/dedup';
-import { DEMO_JOBS } from '../../lib/demoJobs';
+import { getAllCachedLiveJobs } from '../../lib/liveSources';
 import { SOURCE_TYPE_LABEL, SOURCE_PRIORITY } from '../../lib/types';
 import { useAdminStore } from '../../store/useAdminStore';
 
@@ -13,7 +13,7 @@ export default function DuplicatesPage() {
   const threshold = useAdminStore((s) => s.config.duplicateThreshold);
 
   const { groups, merged } = useMemo(() => {
-    const all = findDuplicateGroups(DEMO_JOBS, { threshold });
+    const all = findDuplicateGroups(getAllCachedLiveJobs(), { threshold });
     const withMembers = all.filter((g) => g.members.length > 0);
     const mergedCount = withMembers.reduce((n, g) => n + g.members.length, 0);
     return { groups: withMembers, merged: mergedCount };

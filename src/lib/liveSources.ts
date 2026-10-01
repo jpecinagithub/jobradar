@@ -64,26 +64,9 @@ export const DEFAULT_LIVE_COMPANIES: LiveCompany[] = [
 
 const COMPANIES_KEY = 'jobradar:live-companies:v1';
 const CACHE_KEY = 'jobradar:live-cache:v1';
-const MODE_KEY = 'jobradar:data-mode:v1';
 export const LIVE_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
 const FETCH_TIMEOUT_MS = 25_000;
 const MAX_DESC_CHARS = 3500;
-
-export type DataMode = 'demo' | 'live';
-
-export function getDataMode(): DataMode {
-  try {
-    return localStorage.getItem(MODE_KEY) === 'live' ? 'live' : 'demo';
-  } catch {
-    return 'demo';
-  }
-}
-
-export function saveDataMode(m: DataMode): void {
-  try {
-    localStorage.setItem(MODE_KEY, m);
-  } catch { /* private mode */ }
-}
 
 export function getLiveCompanies(): LiveCompany[] {
   try {
@@ -139,6 +122,12 @@ export function clearLiveCache(): void {
   try {
     localStorage.removeItem(CACHE_KEY);
   } catch { /* ignore */ }
+}
+
+/** Every cached live job across all boards — for admin pages and job detail. */
+export function getAllCachedLiveJobs(): Job[] {
+  const cache = readCache();
+  return Object.values(cache).flatMap((e) => e.jobs ?? []);
 }
 
 export interface LiveCacheStatus {

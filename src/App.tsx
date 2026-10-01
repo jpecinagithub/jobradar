@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
-import { DemoBanner } from './components/layout/DemoBanner';
 import Home from './pages/Home';
 import SearchPage from './pages/SearchPage';
 import JobDetailPage from './pages/JobDetailPage';
@@ -25,7 +24,6 @@ export default function App() {
     <BrowserRouter>
       <div className="flex min-h-screen flex-col">
         <Navbar />
-        <DemoBanner />
         <main className="flex-1">
           <Routes>
             <Route path="/" element={<Home />} />

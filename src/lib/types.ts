@@ -70,7 +70,7 @@ export interface SourceDef {
   frequency: string;
   priority: number;
   enabled: boolean;
-  status: 'ACTIVE' | 'PAUSED' | 'ERROR' | 'DEMO';
+  status: 'ACTIVE' | 'PAUSED' | 'ERROR';
   lastScan?: string;
   jobsIndexed: number;
   errors: number;

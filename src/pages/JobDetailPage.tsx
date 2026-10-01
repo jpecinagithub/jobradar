@@ -4,7 +4,7 @@ import {
   ArrowLeft, MapPin, Clock, Bookmark, BookmarkCheck, CheckCircle2,
   Building2, Briefcase, Layers, Wallet, Globe2, FileText,
 } from 'lucide-react';
-import { DEMO_JOBS } from '../lib/demoJobs';
+import { getAllCachedLiveJobs } from '../lib/liveSources';
 import { useSearchStore } from '../store/useSearchStore';
 import { useUserStore } from '../store/useUserStore';
 import { scoreJob } from '../lib/match';
@@ -64,17 +64,21 @@ export default function JobDetailPage() {
   const unsaveJob = useUserStore((s) => s.unsaveJob);
   const stageOf = useUserStore((s) => s.stageOf);
 
-  const job = useMemo(
-    () =>
-      DEMO_JOBS.find((j) => j.id === id) ??
+  const job = useMemo(() => {
+    if (!id) return null;
+    const fromResult =
+      useSearchStore.getState().result?.jobs.find((r) => r.job.id === id)?.job ?? null;
+    if (fromResult) return fromResult;
+    return (
       entries.find((e) => e.jobId === id)?.snapshot ??
-      null,
-    [id, entries],
-  );
+      getAllCachedLiveJobs().find((j) => j.id === id) ??
+      null
+    );
+  }, [id, entries]);
 
   const scored = useMemo(() => (job ? scoreJob(job, draft) : null), [job, draft]);
 
-  const dupGroups = useMemo(() => findDuplicateGroups(DEMO_JOBS), []);
+  const dupGroups = useMemo(() => findDuplicateGroups(getAllCachedLiveJobs()), []);
   const dupInfo = useMemo(() => {
     if (!job) return undefined;
     const g = dupGroups.find(

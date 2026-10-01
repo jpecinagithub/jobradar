@@ -2,7 +2,7 @@
    Saved searches, tracker, search runs, preferences, admin overrides. */
 
 import type {
-  AdminConfig, SavedJobEntry, SavedSearchRun, SearchProfile, SourceDef,
+  AdminConfig, SavedJobEntry, SavedSearchRun, SearchProfile,
 } from './types';
 import { DEFAULT_ADMIN_CONFIG, createEmptyProfile } from './types';
 
@@ -78,26 +78,16 @@ export function lastRunFor(searchId: string): SavedSearchRun | undefined {
 /* ---- preferences ---- */
 export interface Preferences {
   currency: string;
-  demoNoticeDismissed: boolean;
   lastProfile?: SearchProfile;
 }
 export const getPreferences = (): Preferences =>
-  read('prefs', { currency: 'EUR', demoNoticeDismissed: false });
+  read('prefs', { currency: 'EUR' });
 export const savePreferences = (p: Preferences) => write('prefs', p);
 
 /* ---- admin ---- */
 export const getAdminConfig = (): AdminConfig =>
   ({ ...DEFAULT_ADMIN_CONFIG, ...read<Partial<AdminConfig>>('admin:config', {}) });
 export const saveAdminConfig = (c: AdminConfig) => write('admin:config', c);
-
-export const getSourceDefs = (seed: SourceDef[]): SourceDef[] => {
-  const saved = read<SourceDef[]>('admin:sources', []);
-  if (!saved.length) return seed;
-  // merge: keep admin edits, add any new seed sources
-  const ids = new Set(saved.map((s) => s.id));
-  return [...saved, ...seed.filter((s) => !ids.has(s.id))];
-};
-export const saveSourceDefs = (s: SourceDef[]) => write('admin:sources', s);
 
 /* ---- seed ---- */
 export function ensureSeedProfile(): SearchProfile {

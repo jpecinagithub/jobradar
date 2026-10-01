@@ -159,7 +159,7 @@ export const CURRENCY_SYMBOLS: Record<string, string> = {
   '€': 'EUR', '$': 'USD', '£': 'GBP', 'CHF': 'CHF', 'kr': 'SEK', 'zł': 'PLN',
 };
 
-/** Static indicative rates to EUR (demo-grade; admin can override in real product). */
+/** Static indicative rates to EUR (approximate; salary filters use these for cross-currency comparison). */
 export const FX_TO_EUR: Record<string, number> = {
   EUR: 1, USD: 0.92, GBP: 1.17, CHF: 1.05, SEK: 0.088, NOK: 0.086, DKK: 0.134,
   PLN: 0.23, CZK: 0.04, HUF: 0.0025, RON: 0.20, CAD: 0.67, AUD: 0.60, JPY: 0.0061,

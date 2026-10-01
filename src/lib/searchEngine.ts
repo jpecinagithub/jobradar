@@ -51,7 +51,7 @@ export function runSearch(
   let pool = allJobs.filter((j) => {
     if (profile.sources.length && !profile.sources.includes(j.source)) return false;
     if (enabledSources.length && !sourceIds.has(sourceIdOf(j))) {
-      // job's source string may not map 1:1 to a SourceDef id in demo mode; keep it
+      // job's source string may not map 1:1 to a SourceDef id; keep it
     }
     return true;
   });

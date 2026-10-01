@@ -4,7 +4,6 @@ import {
   Copy, Cpu, BarChart3, Settings,
 } from 'lucide-react';
 import { cn } from '../../components/ui/cn';
-import { Badge } from '../../components/ui/badge';
 import { BRAND } from '../../lib/types';
 
 const NAV = [
@@ -55,7 +54,6 @@ export default function AdminLayout() {
       <div className="flex items-center justify-between py-6">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold tracking-tight text-ink-900">Administration</h1>
-          <Badge variant="warning">DEMO</Badge>
         </div>
         <span className="hidden text-xs text-ink-500 sm:block">{BRAND.name} admin console</span>
       </div>

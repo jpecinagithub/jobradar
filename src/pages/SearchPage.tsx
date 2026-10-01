@@ -14,7 +14,6 @@ import { Select } from '../components/ui/select';
 import { Card, CardContent } from '../components/ui/card';
 import { useSearchStore } from '../store/useSearchStore';
 import { findDuplicateGroups } from '../lib/dedup';
-import { DEMO_JOBS } from '../lib/demoJobs';
 import type { SortMode } from '../lib/types';
 import { cn } from '../components/ui/cn';
 
@@ -35,8 +34,6 @@ export default function SearchPage() {
   const resetDraft = useSearchStore((s) => s.resetDraft);
   const diagnosticsOpen = useSearchStore((s) => s.diagnosticsOpen);
   const setDiagnosticsOpen = useSearchStore((s) => s.setDiagnosticsOpen);
-  const dataMode = useSearchStore((s) => s.dataMode);
-  const setDataMode = useSearchStore((s) => s.setDataMode);
   const liveJobs = useSearchStore((s) => s.liveJobs);
   const liveError = useSearchStore((s) => s.liveError);
 
@@ -59,8 +56,7 @@ export default function SearchPage() {
   }, [searching, result]);
 
   // duplicate groups for the "Also found on N other sources" info
-  const activePool = dataMode === 'live' ? liveJobs : DEMO_JOBS;
-  const dupGroups = useMemo(() => findDuplicateGroups(activePool), [activePool]);
+  const dupGroups = useMemo(() => findDuplicateGroups(liveJobs), [liveJobs]);
   const dupInfoFor = (jobId: string) => {
     const g = dupGroups.find(
       (x) => x.canonical.id === jobId || x.members.some((m) => m.job.id === jobId),
@@ -96,34 +92,10 @@ export default function SearchPage() {
             <Search size={16} />
             SEARCH JOBS
           </Button>
-          {/* Demo / Live data source toggle */}
-          <div
-            role="group"
-            aria-label="Data source"
-            className="flex items-center rounded-xl border border-ink-200 bg-ink-50 p-1"
-          >
-            {(['demo', 'live'] as const).map((m) => (
-              <button
-                key={m}
-                onClick={() => setDataMode(m)}
-                disabled={searching}
-                className={cn(
-                  'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-colors',
-                  dataMode === m
-                    ? m === 'live'
-                      ? 'bg-emerald-600 text-white shadow-sm'
-                      : 'bg-white text-ink-900 shadow-sm'
-                    : 'text-ink-500 hover:text-ink-800',
-                )}
-                title={m === 'live' ? 'Search real listings from connected company boards' : 'Search the demo sample dataset'}
-              >
-                {m === 'live' && (
-                  <span className={cn('h-2 w-2 rounded-full', dataMode === 'live' ? 'bg-white' : 'bg-emerald-500')} />
-                )}
-                {m === 'live' ? 'Live' : 'Demo'}
-              </button>
-            ))}
-          </div>
+          <span className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-[13px] font-semibold text-white">
+            <span className="h-2 w-2 rounded-full bg-white" />
+            Live
+          </span>
           <Button variant="outline" onClick={() => setSaveOpen(true)}>
             <Save size={15} />
             <span className="hidden sm:inline">Save search</span>
@@ -133,7 +105,7 @@ export default function SearchPage() {
             <span className="hidden sm:inline">Reset</span>
           </Button>
         </div>
-        {dataMode === 'live' && liveError && (
+        {liveError && (
           <div className="mx-auto mt-2 max-w-7xl">
             <p className="text-[13px] font-medium text-red-700">{liveError}</p>
           </div>

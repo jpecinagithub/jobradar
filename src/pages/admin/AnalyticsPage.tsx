@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../../components/ui/card';
 import { getSearchRuns } from '../../lib/storage';
-import { DEMO_JOBS } from '../../lib/demoJobs';
+import { getAllCachedLiveJobs } from '../../lib/liveSources';
 import { findDuplicateGroups } from '../../lib/dedup';
 import { SOURCE_TYPE_LABEL } from '../../lib/types';
 import { useAdminStore } from '../../store/useAdminStore';
@@ -27,7 +27,7 @@ export default function AnalyticsPage() {
   const entries = useUserStore((s) => s.entries);
 
   const data = useMemo(() => {
-    const jobs = DEMO_JOBS;
+    const jobs = getAllCachedLiveJobs();
 
     // searches over time (last 14 days)
     const runs = getSearchRuns();
@@ -211,7 +211,7 @@ export default function AnalyticsPage() {
             </div>
             <div className="flex items-center justify-between rounded-lg bg-ink-50 px-4 py-3">
               <span className="text-sm text-ink-600">Apply clicks</span>
-              <span className="text-sm font-medium text-ink-400">Not tracked in this demo</span>
+              <span className="text-sm font-medium text-ink-400">Not tracked</span>
             </div>
           </CardContent>
         </Card>

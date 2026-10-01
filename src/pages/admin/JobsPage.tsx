@@ -7,7 +7,7 @@ import { Select } from '../../components/ui/select';
 import { Badge } from '../../components/ui/badge';
 import { Progress } from '../../components/ui/progress';
 import { timeAgo, formatSalaryCompact } from '../../lib/normalize';
-import { DEMO_JOBS } from '../../lib/demoJobs';
+import { getAllCachedLiveJobs } from '../../lib/liveSources';
 import { SOURCE_TYPE_LABEL, SENIORITY_LABEL, type JobStatus, type SourceType } from '../../lib/types';
 
 const STATUS_VARIANT: Record<JobStatus, 'success' | 'warning' | 'danger' | 'secondary'> = {
@@ -20,9 +20,10 @@ export default function JobsPage() {
   const [typeFilter, setTypeFilter] = useState<'' | SourceType>('');
   const [statusFilter, setStatusFilter] = useState<'' | JobStatus>('');
 
+  const all = useMemo(() => getAllCachedLiveJobs(), []);
   const jobs = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return DEMO_JOBS.filter((j) => {
+    return all.filter((j) => {
       if (typeFilter && j.sourceType !== typeFilter) return false;
       if (statusFilter && j.status !== statusFilter) return false;
       if (!q) return true;
@@ -112,7 +113,7 @@ export default function JobsPage() {
           )}
         </CardContent>
       </Card>
-      <p className="text-xs text-ink-400">{jobs.length} of {DEMO_JOBS.length} indexed jobs shown.</p>
+      <p className="text-xs text-ink-400">{jobs.length} of {all.length} indexed jobs shown.</p>
     </div>
   );
 }

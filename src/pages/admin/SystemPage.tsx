@@ -7,7 +7,7 @@ import { saveSavedSearches, saveSavedJobs } from '../../lib/storage';
 import { useAdminStore } from '../../store/useAdminStore';
 import { useUserStore } from '../../store/useUserStore';
 
-const APP_VERSION = '1.0.0-demo';
+const APP_VERSION = '1.0.0';
 const BUILD_DATE = '2026-10-01';
 
 const HEALTH_ITEMS = [
@@ -84,7 +84,7 @@ export default function SystemPage() {
             <div className="flex justify-between"><span className="text-ink-500">Build date</span><span className="font-medium text-ink-900">{BUILD_DATE}</span></div>
             <div className="flex justify-between"><span className="text-ink-500">Frontend</span><span className="font-medium text-ink-900">Vite + React + TypeScript</span></div>
             <div className="flex justify-between"><span className="text-ink-500">Sources configured</span><span className="font-medium text-ink-900">{sources.length} ({enabledSources} enabled)</span></div>
-            <div className="flex justify-between"><span className="text-ink-500">Persistence</span><Badge variant="brand">localStorage · demo</Badge></div>
+            <div className="flex justify-between"><span className="text-ink-500">Persistence</span><Badge variant="brand">localStorage</Badge></div>
           </CardContent>
         </Card>
 

@@ -6,12 +6,10 @@ import {
   recordSearchRun, upsertSavedSearch, getPreferences, savePreferences,
 } from '../lib/storage';
 import { runSearch } from '../lib/searchEngine';
-import { DEMO_JOBS } from '../lib/demoJobs';
-import { SOURCE_SEEDS } from '../lib/sourceSeeds';
-import { getSourceDefs } from '../lib/storage';
+import { getConnectedSources } from '../lib/connectedSources';
 import {
-  ensureLiveJobs, getDataMode, saveDataMode,
-  type DataMode, type LiveFetchOutcome,
+  ensureLiveJobs,
+  type LiveFetchOutcome,
 } from '../lib/liveSources';
 import { fetchEnabledPrivateSources } from '../lib/privateSources';
 
@@ -23,11 +21,9 @@ interface SearchState {
   savedSearches: SearchProfile[];
   diagnosticsOpen: boolean;
   understood: string[] | null;
-  dataMode: DataMode;
   liveJobs: Job[];
   liveInfo: { jobs: number; companies: number; fetchedAt: string; fromCache: boolean } | null;
   liveError: string | null;
-  setDataMode: (m: DataMode) => void;
   refreshLive: (force?: boolean) => Promise<LiveFetchOutcome | null>;
   setDraft: (p: SearchProfile) => void;
   patchDraft: (p: Partial<SearchProfile>) => void;
@@ -41,13 +37,6 @@ interface SearchState {
   refreshSaved: () => void;
 }
 
-const STAGES = [
-  'Searching 24 sources…',
-  'Normalizing results…',
-  'Removing duplicates…',
-  'Scoring matches…',
-];
-
 export const useSearchStore = create<SearchState>((set, get) => ({
   draft: createEmptyProfile(),
   result: null,
@@ -56,15 +45,9 @@ export const useSearchStore = create<SearchState>((set, get) => ({
   savedSearches: getSavedSearches(),
   diagnosticsOpen: false,
   understood: null,
-  dataMode: getDataMode(),
   liveJobs: [],
   liveInfo: null,
   liveError: null,
-
-  setDataMode: (m) => {
-    saveDataMode(m);
-    set({ dataMode: m, result: null, liveError: null });
-  },
 
   refreshLive: async (force = false) => {
     try {
@@ -105,9 +88,8 @@ export const useSearchStore = create<SearchState>((set, get) => ({
 
   run: (profile) => {
     const p = profile ?? get().draft;
-    const live = get().dataMode === 'live';
 
-    const finish = (pool: Job[], sources: ReturnType<typeof getSourceDefs>) => {
+    const finish = (pool: Job[], sources: ReturnType<typeof getConnectedSources>) => {
       const prev = p.id ? lastRunFor(p.id)?.jobIds : undefined;
       const result = runSearch(p, pool, { previousJobIds: prev, sources });
 
@@ -123,49 +105,33 @@ export const useSearchStore = create<SearchState>((set, get) => ({
       set({ searching: false, searchStage: '', result });
     };
 
-    if (live) {
-      // LIVE: fetch real boards first (cached 6h), then private API sources,
-      // then run the same pipeline over the merged pool.
-      set({ searching: true, searchStage: 'Connecting to live sources…', liveError: null });
-      get().refreshLive(false).then(async (outcome) => {
-        set({ searchStage: 'Checking private sources…' });
-        let privateJobs: Job[] = [];
-        try {
-          const priv = await fetchEnabledPrivateSources((done, total, name) =>
-            set({ searchStage: `Fetching ${name}… (${done}/${total})` }),
-          );
-          privateJobs = priv.flatMap((r) => r.jobs);
-          const problems = priv.filter((r) => r.error || r.skipped);
-          if (problems.length && !privateJobs.length && !(outcome && outcome.jobs.length)) {
-            // everything failed — surface it instead of a silent empty result
-            set({ liveError: problems[0].error ?? problems[0].skipped ?? 'Live fetch failed.' });
-          }
-        } catch {
-          /* private sources are best-effort */
+    // Live-only: fetch real boards first (cached 6h), then private API sources,
+    // then run the same pipeline over the merged pool.
+    set({ searching: true, searchStage: 'Connecting to live sources…', liveError: null });
+    get().refreshLive(false).then(async (outcome) => {
+      set({ searchStage: 'Checking private sources…' });
+      let privateJobs: Job[] = [];
+      try {
+        const priv = await fetchEnabledPrivateSources((done, total, name) =>
+          set({ searchStage: `Fetching ${name}… (${done}/${total})` }),
+        );
+        privateJobs = priv.flatMap((r) => r.jobs);
+        const problems = priv.filter((r) => r.error || r.skipped);
+        if (problems.length && !privateJobs.length && !(outcome && outcome.jobs.length)) {
+          // everything failed — surface it instead of a silent empty result
+          set({ liveError: problems[0].error ?? problems[0].skipped ?? 'Live fetch failed.' });
         }
-        const pool = [...(outcome ? outcome.jobs : get().liveJobs), ...privateJobs];
-        if (!pool.length) {
-          set({ searching: false, searchStage: '' });
-          return;
-        }
-        set({ searchStage: 'Scoring matches…' });
-        window.setTimeout(() => finish(pool, []), 500);
-      });
-      return;
-    }
-
-    set({ searching: true, searchStage: STAGES[0] });
-    // staged progress for the premium "engine" feel
-    let i = 0;
-    const tick = window.setInterval(() => {
-      i++;
-      if (i < STAGES.length) set({ searchStage: STAGES[i] });
-    }, 650);
-
-    window.setTimeout(() => {
-      window.clearInterval(tick);
-      finish(DEMO_JOBS, getSourceDefs(SOURCE_SEEDS));
-    }, 2400);
+      } catch {
+        /* private sources are best-effort */
+      }
+      const pool = [...(outcome ? outcome.jobs : get().liveJobs), ...privateJobs];
+      if (!pool.length) {
+        set({ searching: false, searchStage: '' });
+        return;
+      }
+      set({ searchStage: 'Scoring matches…' });
+      window.setTimeout(() => finish(pool, getConnectedSources()), 500);
+    });
   },
 
   runSaved: (id) => {

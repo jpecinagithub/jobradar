@@ -5,8 +5,9 @@ JOBRADAR indexes original postings (ATS + company career pages), deduplicates
 them aggressively, and matches them against your profile with **hard filters**
 (eliminate) vs **soft filters** (boost score) — every score fully explainable.
 
-> **Demo mode.** This build ships with `DEMO DATA`: 72 realistic sample listings
-> across 28 sources. Connect real sources in **Admin → Sources** to go live.
+> **Live-only.** JOBRADAR ships with zero demo data. Every search runs against
+> real listings from connected sources — 11 company ATS boards out of the box,
+> plus your own private API connectors (Admin → Sources).
 
 ## Quick start
 
@@ -90,8 +91,10 @@ RETURN → MARK AS APPLIED → RUN SEARCH AGAIN → SEE ONLY NEW JOBS`
 
 ## Live sources: real job data (2026-10-01)
 
-JOBRADAR ships in **Demo mode** (72 sample jobs, clearly labeled DEMO DATA).
-Flip the **Demo/Live** toggle on the search page to query real listings.
+JOBRADAR is live-only — there is no demo data anywhere in the product. Every
+search queries the real connected sources: the 11 preconfigured company boards
+plus any private API connectors you add. Boards are cached for 6 hours
+(`localStorage`) and refreshed on every search.
 
 ### Architecture
 

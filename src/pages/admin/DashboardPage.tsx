@@ -8,7 +8,7 @@ import { Badge } from '../../components/ui/badge';
 import { timeAgo, daysSince } from '../../lib/normalize';
 import { findDuplicateGroups } from '../../lib/dedup';
 import { getSearchRuns } from '../../lib/storage';
-import { DEMO_JOBS } from '../../lib/demoJobs';
+import { getAllCachedLiveJobs } from '../../lib/liveSources';
 import { SOURCE_TYPE_LABEL } from '../../lib/types';
 import { useAdminStore } from '../../store/useAdminStore';
 
@@ -34,7 +34,7 @@ export default function DashboardPage() {
   const config = useAdminStore((s) => s.config);
 
   const stats = useMemo(() => {
-    const jobs = DEMO_JOBS;
+    const jobs = getAllCachedLiveJobs();
     const activeSources = sources.filter((s) => s.enabled).length;
     const new24h = jobs.filter((j) => daysSince(j.postedAt) <= 1).length;
     const active = jobs.filter((j) => j.status === 'ACTIVE').length;
