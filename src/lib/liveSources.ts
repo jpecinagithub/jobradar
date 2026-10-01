@@ -196,7 +196,7 @@ function stripHtml(html: string): string {
 
 /* ---------------- Location / remote parsing ---------------- */
 
-function parseLocation(raw: string): {
+export function parseLocation(raw: string): {
   city?: string; country?: string; remoteType: RemoteType;
   note?: string; countries?: string[];
 } {

@@ -87,3 +87,61 @@ RETURN → MARK AS APPLIED → RUN SEARCH AGAIN → SEE ONLY NEW JOBS`
 - NL parser drops terms outside its taxonomies (e.g. “Klingon”, “Antarctica”);
   it warns in the understood panel but cannot match what it doesn't know.
 - Search state is in-memory; a page reload clears results (saved searches persist).
+
+## Live sources: real job data (2026-10-01)
+
+JOBRADAR ships in **Demo mode** (72 sample jobs, clearly labeled DEMO DATA).
+Flip the **Demo/Live** toggle on the search page to query real listings.
+
+### Architecture
+
+- **ATS connectors** (`src/lib/liveSources.ts`): official public JSON APIs —
+  Greenhouse (`boards-api.greenhouse.io/v1/boards/{slug}/jobs`) and Ashby
+  (`api.ashbyhq.com/posting-api/job-board/{slug}`). No auth, no scraping,
+  CORS-enabled (`Access-Control-Allow-Origin: *`), called straight from the browser.
+- 11 boards ship enabled: Stripe, Airbnb, Anthropic, Figma, Datadog, Coinbase,
+  Robinhood (Greenhouse); Vercel, Linear, Ramp, Mercury (Ashby).
+- **Cache**: 6-hour `localStorage` cache per board (slim fallback if quota is hit).
+- **Honesty rules**: salary is only stored when the ATS exposes explicit numeric
+  compensation — never inferred or invented. Apply always opens the original ATS posting.
+- **Admin → Sources → Live company boards**: add boards by ATS slug, real
+  Test-connection (live fetch), enable/disable, Refresh all, clear cache.
+- Live results run through the same pipeline: dedup, hard/soft filters,
+  explainable scores, diagnostics.
+
+### Private sources + encrypted vault
+
+**Admin → Sources → Private sources** lets you connect your own sources:
+
+- **API connector**: any JSON endpoint (official API with a personal token, or a
+  public feed). You map the JSON fields once (dot-paths: `results`,
+  `data.jobs.0.title`, …); the connector fetches and normalizes on every live
+  search. Auth: none, Bearer token, or custom header. A real Test button shows
+  mapped preview listings before you rely on it.
+- **Site login** (username + password): credentials are accepted and stored
+  **encrypted**, but each site needs its own connector — browsers cannot perform
+  cross-origin logins generically. Such sources are registered honestly as
+  “connector pending” and are **never faked into results**. Tell the developer
+  which site it is and its connector can be built.
+- **Vault** (`src/lib/vault.ts`): AES-GCM-256, key derived from your passphrase
+  via PBKDF2-SHA-256 (120k rounds). The key lives in memory only; only
+  ciphertext + salt touch `localStorage`. Forget the passphrase and the secrets
+  cannot be recovered — by design. Secrets never leave the device except inside
+  the encrypted request to the source itself.
+
+### Limitations
+
+- Browser-only: an endpoint without CORS headers cannot be fetched from the app
+  (the Test button will say so honestly).
+- Greenhouse's list endpoint may omit full descriptions; some boards paginate —
+  `per_page=500` covers the current 11.
+- Empty boards are a valid connection (0 jobs), not a failure.
+- Live fetch was verified against real API payloads in Node (786 jobs mapped,
+  0 missing required fields); end-to-end browser fetch depends on the user's
+  network, since sandbox browsers here cannot reach the public internet.
+
+### Adding a board
+
+Greenhouse: the slug in `job-boards.greenhouse.io/{slug}`.
+Ashby: the slug in `jobs.ashbyhq.com/{slug}`.
+Add it in Admin → Sources, hit the flask icon to verify, enable it.

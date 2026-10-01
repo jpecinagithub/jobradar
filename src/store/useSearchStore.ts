@@ -13,6 +13,7 @@ import {
   ensureLiveJobs, getDataMode, saveDataMode,
   type DataMode, type LiveFetchOutcome,
 } from '../lib/liveSources';
+import { fetchEnabledPrivateSources } from '../lib/privateSources';
 
 interface SearchState {
   draft: SearchProfile;
@@ -123,10 +124,26 @@ export const useSearchStore = create<SearchState>((set, get) => ({
     };
 
     if (live) {
-      // LIVE: fetch real boards first (cached 6h), then run the same pipeline
+      // LIVE: fetch real boards first (cached 6h), then private API sources,
+      // then run the same pipeline over the merged pool.
       set({ searching: true, searchStage: 'Connecting to live sources…', liveError: null });
-      get().refreshLive(false).then((outcome) => {
-        const pool = outcome && outcome.jobs.length ? outcome.jobs : get().liveJobs;
+      get().refreshLive(false).then(async (outcome) => {
+        set({ searchStage: 'Checking private sources…' });
+        let privateJobs: Job[] = [];
+        try {
+          const priv = await fetchEnabledPrivateSources((done, total, name) =>
+            set({ searchStage: `Fetching ${name}… (${done}/${total})` }),
+          );
+          privateJobs = priv.flatMap((r) => r.jobs);
+          const problems = priv.filter((r) => r.error || r.skipped);
+          if (problems.length && !privateJobs.length && !(outcome && outcome.jobs.length)) {
+            // everything failed — surface it instead of a silent empty result
+            set({ liveError: problems[0].error ?? problems[0].skipped ?? 'Live fetch failed.' });
+          }
+        } catch {
+          /* private sources are best-effort */
+        }
+        const pool = [...(outcome ? outcome.jobs : get().liveJobs), ...privateJobs];
         if (!pool.length) {
           set({ searching: false, searchStage: '' });
           return;
