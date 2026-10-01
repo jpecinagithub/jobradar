@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Plus, FlaskConical, Pencil, Trash2, ShieldCheck } from 'lucide-react';
+import { Plus, FlaskConical, Pencil, Trash2, ShieldCheck, RefreshCw, Building2 } from 'lucide-react';
 import { Card, CardContent } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -13,6 +13,12 @@ import { timeAgo } from '../../lib/normalize';
 import { DEMO_JOBS } from '../../lib/demoJobs';
 import { SOURCE_TYPE_LABEL, type SourceDef, type SourceMethod, type SourceType } from '../../lib/types';
 import { useAdminStore } from '../../store/useAdminStore';
+import {
+  ATS_LABEL, boardUrl, clearLiveCache, getLiveCacheStatus, getLiveCompanies,
+  saveLiveCompanies, testCompanyConnection,
+  type AtsKind, type LiveCompany,
+} from '../../lib/liveSources';
+import { useSearchStore } from '../../store/useSearchStore';
 
 const METHODS: SourceMethod[] = ['API', 'RSS', 'STRUCTURED_DATA', 'CAREER_PAGE', 'CUSTOM_CONNECTOR', 'MANUAL', 'APPROVED_CRAWLER'];
 const TYPES: SourceType[] = ['PRIMARY', 'ATS', 'SPECIALIST_BOARD', 'OFFICIAL', 'AGGREGATOR', 'SEARCH_ENGINE'];
@@ -59,6 +65,211 @@ const EMPTY_EDITOR: Omit<SourceDef, 'id' | 'lastScan' | 'jobsIndexed' | 'errors'
   method: 'API', endpoint: '', frequency: 'daily', priority: 5,
   enabled: true, notes: '',
 };
+
+/* ---------------- Live company boards (real ATS data) ---------------- */
+
+function LiveBoardsSection() {
+  const [companies, setCompanies] = useState<LiveCompany[]>(() => getLiveCompanies());
+  const [status, setStatus] = useState(() => getLiveCacheStatus());
+  const [form, setForm] = useState({ name: '', ats: 'greenhouse' as AtsKind, slug: '', sector: 'Technology' });
+  const [testing, setTesting] = useState<string | null>(null);
+  const [testMsg, setTestMsg] = useState<{ id: string; ok: boolean; text: string } | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshLive = useSearchStore((s) => s.refreshLive);
+
+  const persist = (list: LiveCompany[]) => {
+    saveLiveCompanies(list);
+    setCompanies(list);
+    setStatus(getLiveCacheStatus());
+  };
+
+  const addCompany = () => {
+    const name = form.name.trim();
+    const slug = form.slug.trim().toLowerCase().replace(/\s+/g, '');
+    if (!name || !slug) return;
+    if (companies.some((c) => c.ats === form.ats && c.slug === slug)) {
+      setTestMsg({ id: '__form', ok: false, text: 'That board is already registered.' });
+      return;
+    }
+    persist([...companies, {
+      id: `live_${form.ats}_${slug}_${Date.now().toString(36)}`,
+      name, ats: form.ats, slug, sector: form.sector.trim() || 'Technology', enabled: true,
+    }]);
+    setForm({ name: '', ats: 'greenhouse', slug: '', sector: 'Technology' });
+    setTestMsg(null);
+  };
+
+  const testBoard = async (c: LiveCompany) => {
+    setTesting(c.id);
+    setTestMsg(null);
+    try {
+      const n = await testCompanyConnection(c);
+      setTestMsg({ id: c.id, ok: true, text: `OK — ${n} live job${n === 1 ? '' : 's'} found.` });
+    } catch (e) {
+      setTestMsg({ id: c.id, ok: false, text: `Failed: ${e instanceof Error ? e.message : 'connection error'}` });
+    } finally {
+      setTesting(null);
+    }
+  };
+
+  const refreshAll = async () => {
+    setRefreshing(true);
+    await refreshLive(true);
+    setStatus(getLiveCacheStatus());
+    setRefreshing(false);
+  };
+
+  const statusFor = (id: string) => status.find((s) => s.companyId === id);
+  const totalJobs = status.reduce((a, s) => a + s.jobCount, 0);
+
+  return (
+    <Card className="border-emerald-200">
+      <CardContent className="pt-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Building2 className="h-5 w-5 text-emerald-700" />
+            <div>
+              <h3 className="text-[15px] font-semibold text-ink-900">Live company boards</h3>
+              <p className="text-[13px] text-ink-500">
+                Real listings via the official public APIs of Greenhouse and Ashby. Cached for 6 hours.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant="success">{totalJobs.toLocaleString()} jobs cached</Badge>
+            <Button variant="outline" size="sm" onClick={refreshAll} disabled={refreshing}>
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? 'Refreshing…' : 'Refresh all'}
+            </Button>
+            <Button
+              variant="ghost" size="sm"
+              onClick={() => { clearLiveCache(); setStatus(getLiveCacheStatus()); }}
+              title="Clear cached listings"
+            >
+              Clear cache
+            </Button>
+          </div>
+        </div>
+
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[760px] text-sm">
+            <thead>
+              <tr className="border-b border-ink-200 text-left text-xs uppercase tracking-wide text-ink-500">
+                <th className="px-3 py-2 font-medium">Company</th>
+                <th className="px-3 py-2 font-medium">ATS</th>
+                <th className="px-3 py-2 font-medium">Status</th>
+                <th className="px-3 py-2 font-medium text-right">Jobs</th>
+                <th className="px-3 py-2 font-medium">Last fetch</th>
+                <th className="px-3 py-2 font-medium text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {companies.map((c) => {
+                const st = statusFor(c.id);
+                return (
+                  <tr key={c.id} className="border-b border-ink-100 last:border-0 hover:bg-ink-50/60">
+                    <td className="px-3 py-2.5">
+                      <div className="font-medium text-ink-900">{c.name}</div>
+                      <a
+                        href={boardUrl(c)} target="_blank" rel="noreferrer"
+                        className="text-xs text-brand-700 hover:underline"
+                      >
+                        {c.slug}
+                      </a>
+                    </td>
+                    <td className="px-3 py-2.5"><Badge variant="secondary">{ATS_LABEL[c.ats]}</Badge></td>
+                    <td className="px-3 py-2.5">
+                      {st?.error ? (
+                        <Badge variant="danger" title={st.error}>Error</Badge>
+                      ) : st?.fetchedAt ? (
+                        <Badge variant={st.stale ? 'warning' : 'success'}>{st.stale ? 'Stale' : 'Fresh'}</Badge>
+                      ) : (
+                        <Badge variant="secondary">Never fetched</Badge>
+                      )}
+                      {testMsg?.id === c.id && (
+                        <div className={`mt-1 text-xs ${testMsg.ok ? 'text-success-700' : 'text-danger-600'}`}>
+                          {testMsg.text}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-medium text-ink-900">
+                      {(st?.jobCount ?? 0).toLocaleString()}
+                    </td>
+                    <td className="px-3 py-2.5 text-ink-600">
+                      {st?.fetchedAt ? timeAgo(st.fetchedAt) : '—'}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost" size="sm" title="Test connection (real fetch)"
+                          onClick={() => testBoard(c)} disabled={testing === c.id}
+                        >
+                          <FlaskConical className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost" size="sm" title="Delete board"
+                          onClick={() => {
+                            if (window.confirm(`Remove "${c.name}" from live boards?`)) {
+                              persist(companies.filter((x) => x.id !== c.id));
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 text-danger-600" />
+                        </Button>
+                        <Switch
+                          checked={c.enabled}
+                          onChange={(v) => persist(companies.map((x) => x.id === c.id ? { ...x, enabled: v } : x))} />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* add board */}
+        <div className="mt-4 rounded-xl border border-dashed border-ink-300 bg-ink-50/50 p-4">
+          <p className="mb-3 text-[13px] font-semibold text-ink-900">Add a company board</p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="space-y-1.5">
+              <Label>Company</Label>
+              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Acme Corp" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>ATS</Label>
+              <Select value={form.ats} onChange={(e) => setForm({ ...form, ats: e.target.value as AtsKind })}>
+                <option value="greenhouse">Greenhouse</option>
+                <option value="ashby">Ashby</option>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Board slug</Label>
+              <Input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} placeholder="acme" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Sector</Label>
+              <Input value={form.sector} onChange={(e) => setForm({ ...form, sector: e.target.value })} placeholder="Technology" />
+            </div>
+            <div className="flex items-end">
+              <Button onClick={addCompany} className="w-full">
+                <Plus className="h-4 w-4" /> Add board
+              </Button>
+            </div>
+          </div>
+          <p className="mt-2 text-xs text-ink-500">
+            The slug is the board name in the company's ATS URL — e.g. <span className="font-mono">acme</span> in
+            job-boards.greenhouse.io/<span className="font-mono">acme</span> or jobs.ashbyhq.com/<span className="font-mono">acme</span>.
+            Use the flask button to verify it before relying on it.
+          </p>
+          {testMsg?.id === '__form' && (
+            <p className="mt-2 text-xs text-danger-600">{testMsg.text}</p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function SourcesPage() {
   const sources = useAdminStore((s) => s.sources);
@@ -121,6 +332,8 @@ export default function SourcesPage() {
           <Plus className="h-4 w-4" /> Add source
         </Button>
       </div>
+
+      <LiveBoardsSection />
 
       <Card>
         <CardContent className="p-0">

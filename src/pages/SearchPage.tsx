@@ -35,6 +35,10 @@ export default function SearchPage() {
   const resetDraft = useSearchStore((s) => s.resetDraft);
   const diagnosticsOpen = useSearchStore((s) => s.diagnosticsOpen);
   const setDiagnosticsOpen = useSearchStore((s) => s.setDiagnosticsOpen);
+  const dataMode = useSearchStore((s) => s.dataMode);
+  const setDataMode = useSearchStore((s) => s.setDataMode);
+  const liveJobs = useSearchStore((s) => s.liveJobs);
+  const liveError = useSearchStore((s) => s.liveError);
 
   const [saveOpen, setSaveOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -55,7 +59,8 @@ export default function SearchPage() {
   }, [searching, result]);
 
   // duplicate groups for the "Also found on N other sources" info
-  const dupGroups = useMemo(() => findDuplicateGroups(DEMO_JOBS), []);
+  const activePool = dataMode === 'live' ? liveJobs : DEMO_JOBS;
+  const dupGroups = useMemo(() => findDuplicateGroups(activePool), [activePool]);
   const dupInfoFor = (jobId: string) => {
     const g = dupGroups.find(
       (x) => x.canonical.id === jobId || x.members.some((m) => m.job.id === jobId),
@@ -86,11 +91,39 @@ export default function SearchPage() {
 
       {/* STICKY ACTION BAR */}
       <div className="sticky top-16 z-30 -mx-4 mt-8 border-y border-ink-100 bg-white/90 px-4 py-3 backdrop-blur-md sm:-mx-6 sm:px-6">
-        <div className="mx-auto flex max-w-7xl items-center gap-2">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-2">
           <Button variant="brand" onClick={() => run()} disabled={searching} className="px-8">
             <Search size={16} />
             SEARCH JOBS
           </Button>
+          {/* Demo / Live data source toggle */}
+          <div
+            role="group"
+            aria-label="Data source"
+            className="flex items-center rounded-xl border border-ink-200 bg-ink-50 p-1"
+          >
+            {(['demo', 'live'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setDataMode(m)}
+                disabled={searching}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-colors',
+                  dataMode === m
+                    ? m === 'live'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'bg-white text-ink-900 shadow-sm'
+                    : 'text-ink-500 hover:text-ink-800',
+                )}
+                title={m === 'live' ? 'Search real listings from connected company boards' : 'Search the demo sample dataset'}
+              >
+                {m === 'live' && (
+                  <span className={cn('h-2 w-2 rounded-full', dataMode === 'live' ? 'bg-white' : 'bg-emerald-500')} />
+                )}
+                {m === 'live' ? 'Live' : 'Demo'}
+              </button>
+            ))}
+          </div>
           <Button variant="outline" onClick={() => setSaveOpen(true)}>
             <Save size={15} />
             <span className="hidden sm:inline">Save search</span>
@@ -100,6 +133,11 @@ export default function SearchPage() {
             <span className="hidden sm:inline">Reset</span>
           </Button>
         </div>
+        {dataMode === 'live' && liveError && (
+          <div className="mx-auto mt-2 max-w-7xl">
+            <p className="text-[13px] font-medium text-red-700">{liveError}</p>
+          </div>
+        )}
       </div>
 
       {/* RESULTS */}

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { SearchProfile, SearchResult } from '../lib/types';
+import type { Job, SearchProfile, SearchResult } from '../lib/types';
 import { createEmptyProfile } from '../lib/types';
 import {
   deleteSavedSearch, getSavedSearches, lastRunFor,
@@ -9,6 +9,10 @@ import { runSearch } from '../lib/searchEngine';
 import { DEMO_JOBS } from '../lib/demoJobs';
 import { SOURCE_SEEDS } from '../lib/sourceSeeds';
 import { getSourceDefs } from '../lib/storage';
+import {
+  ensureLiveJobs, getDataMode, saveDataMode,
+  type DataMode, type LiveFetchOutcome,
+} from '../lib/liveSources';
 
 interface SearchState {
   draft: SearchProfile;
@@ -18,6 +22,12 @@ interface SearchState {
   savedSearches: SearchProfile[];
   diagnosticsOpen: boolean;
   understood: string[] | null;
+  dataMode: DataMode;
+  liveJobs: Job[];
+  liveInfo: { jobs: number; companies: number; fetchedAt: string; fromCache: boolean } | null;
+  liveError: string | null;
+  setDataMode: (m: DataMode) => void;
+  refreshLive: (force?: boolean) => Promise<LiveFetchOutcome | null>;
   setDraft: (p: SearchProfile) => void;
   patchDraft: (p: Partial<SearchProfile>) => void;
   resetDraft: () => void;
@@ -45,6 +55,41 @@ export const useSearchStore = create<SearchState>((set, get) => ({
   savedSearches: getSavedSearches(),
   diagnosticsOpen: false,
   understood: null,
+  dataMode: getDataMode(),
+  liveJobs: [],
+  liveInfo: null,
+  liveError: null,
+
+  setDataMode: (m) => {
+    saveDataMode(m);
+    set({ dataMode: m, result: null, liveError: null });
+  },
+
+  refreshLive: async (force = false) => {
+    try {
+      const outcome = await ensureLiveJobs(
+        (done, total, name) => set({ searchStage: `Fetching ${name}… (${done}/${total})` }),
+        force,
+      );
+      const companies = outcome.perCompany.filter((p) => !p.error).length;
+      set({
+        liveJobs: outcome.jobs,
+        liveInfo: {
+          jobs: outcome.jobs.length,
+          companies,
+          fetchedAt: outcome.fetchedAt,
+          fromCache: outcome.fromCache,
+        },
+        liveError: outcome.jobs.length === 0
+          ? 'No live jobs could be fetched. Check your connection or manage boards in Admin → Sources.'
+          : null,
+      });
+      return outcome;
+    } catch {
+      set({ liveError: 'Live fetch failed unexpectedly.' });
+      return null;
+    }
+  },
 
   setDraft: (p) => {
     set({ draft: p });
@@ -59,18 +104,11 @@ export const useSearchStore = create<SearchState>((set, get) => ({
 
   run: (profile) => {
     const p = profile ?? get().draft;
-    set({ searching: true, searchStage: STAGES[0] });
-    // staged progress for the premium "engine" feel
-    let i = 0;
-    const tick = window.setInterval(() => {
-      i++;
-      if (i < STAGES.length) set({ searchStage: STAGES[i] });
-    }, 650);
+    const live = get().dataMode === 'live';
 
-    window.setTimeout(() => {
+    const finish = (pool: Job[], sources: ReturnType<typeof getSourceDefs>) => {
       const prev = p.id ? lastRunFor(p.id)?.jobIds : undefined;
-      const sources = getSourceDefs(SOURCE_SEEDS);
-      const result = runSearch(p, DEMO_JOBS, { previousJobIds: prev, sources });
+      const result = runSearch(p, pool, { previousJobIds: prev, sources });
 
       if (p.id) {
         recordSearchRun({
@@ -81,8 +119,35 @@ export const useSearchStore = create<SearchState>((set, get) => ({
           jobIds: result.jobs.map((j) => j.job.id),
         });
       }
-      window.clearInterval(tick);
       set({ searching: false, searchStage: '', result });
+    };
+
+    if (live) {
+      // LIVE: fetch real boards first (cached 6h), then run the same pipeline
+      set({ searching: true, searchStage: 'Connecting to live sources…', liveError: null });
+      get().refreshLive(false).then((outcome) => {
+        const pool = outcome && outcome.jobs.length ? outcome.jobs : get().liveJobs;
+        if (!pool.length) {
+          set({ searching: false, searchStage: '' });
+          return;
+        }
+        set({ searchStage: 'Scoring matches…' });
+        window.setTimeout(() => finish(pool, []), 500);
+      });
+      return;
+    }
+
+    set({ searching: true, searchStage: STAGES[0] });
+    // staged progress for the premium "engine" feel
+    let i = 0;
+    const tick = window.setInterval(() => {
+      i++;
+      if (i < STAGES.length) set({ searchStage: STAGES[i] });
+    }, 650);
+
+    window.setTimeout(() => {
+      window.clearInterval(tick);
+      finish(DEMO_JOBS, getSourceDefs(SOURCE_SEEDS));
     }, 2400);
   },
 
